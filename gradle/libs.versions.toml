@@ -1,0 +1,7 @@
+[versions]
+kotlinxCoroutines = "1.10.2"
+kotlinLogging = "7.0.6"
+
+[libraries]
+kotlinxCoroutines = { version.ref = "kotlinxCoroutines", module = "org.jetbrains.kotlinx:kotlinx-coroutines-core" }
+kotlinLogging = { version.ref = "kotlinLogging", module = "io.github.oshai:kotlin-logging-jvm" }
