@@ -16,7 +16,11 @@ func ReadAllLines(reader io.Reader) (ret string, err error) {
 	for {
 		buf, err = r.ReadBytes('\n')
 		if len(buf) > 0 && buf[len(buf)-1] == '\n' {
-			builder.Write(buf[:len(buf)-1])
+			buf = buf[:len(buf)-1]
+			if len(buf) > 0 && buf[len(buf)-1] == '\r' {
+				buf = buf[:len(buf)-1]
+			}
+			builder.Write(buf)
 		} else {
 			builder.Write(buf)
 		}

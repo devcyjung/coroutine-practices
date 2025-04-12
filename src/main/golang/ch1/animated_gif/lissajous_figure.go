@@ -29,7 +29,7 @@ func DrawLissajousFigure(
 	var res float64
 	if l.Palette == nil || len(l.Palette) == 0 {
 		for range 2 {
-			palette = append(l.Palette, color.RGBA{
+			palette = append(palette, color.RGBA{
 				R: uint8(rand.UintN(256)),
 				G: uint8(rand.UintN(256)),
 				B: uint8(rand.UintN(256)),

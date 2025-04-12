@@ -1,7 +1,7 @@
 package main
 
 import (
-	"animated_gif"
+	"examples/ch1/animated_gif"
 	"fmt"
 	"image/color"
 	"os"

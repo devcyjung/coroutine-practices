@@ -19,6 +19,9 @@ func FindDuplicateLines(reader io.Reader) (result []string, err error) {
 		if len(buf) > 0 && buf[len(buf)-1] == '\n' {
 			buf = buf[:len(buf)-1]
 		}
+		if len(buf) > 0 && buf[len(buf)-1] == '\r' {
+			buf = buf[:len(buf)-1]
+		}
 		m[string(buf)]++
 		if err != nil {
 			break
