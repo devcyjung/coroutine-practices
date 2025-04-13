@@ -1,0 +1,2 @@
+2025/04/13 23:34:39 main.go:30: Bad request /plot?id=134
+2025/04/13 23:34:44 main.go:30: Bad request /plot?id=301asdf
