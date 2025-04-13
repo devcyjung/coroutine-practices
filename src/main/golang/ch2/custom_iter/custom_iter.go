@@ -1,5 +1,5 @@
 // Package custom_iter is my Golang implementation of Iterator in Rust
-// nightly-only experimental API was excluded from this implementation.
+// nightly-only experimental API (as of Rust 1.86.0) were excluded from this implementation.
 // Methods that turn iterator into collection(s) such as collect & partition were limited to slice rather than generic "collection".
 // In my opinion in Golang, these methods need to be implemented on per collection type basis.
 // In Rust there is FromIterator trait which defines how conversion from Iterator to each Collection works.
@@ -7,6 +7,7 @@
 package custom_iter
 
 import (
+	"cmp"
 	"iter"
 	"slices"
 )
@@ -143,25 +144,25 @@ func PartitionIntoSlices[T any](it iter.Seq[T], pred func(T) bool) ([]T, []T) {
 
 func TryFold[T, R any, E error](it iter.Seq[T], init R, foldFn func(R, T) (R, E)) (R, E) {
 	acc := init
-	var err E
+	var err error
 	for t := range it {
 		acc, err = foldFn(acc, t)
 		if err != nil {
-			return acc, err
+			return acc, err.(E)
 		}
 	}
-	return acc, err
+	return acc, err.(E)
 }
 
 func TryForEach[T any, E error](it iter.Seq[T], doFn func(T) E) E {
-	var err E
+	var err error
 	for t := range it {
 		err = doFn(t)
 		if err != nil {
-			return err
+			return err.(E)
 		}
 	}
-	return err
+	return err.(E)
 }
 
 func Fold[T, R any](it iter.Seq[T], init R, foldFn func(R, T) R) R {
@@ -484,4 +485,316 @@ func FindMap[T, R any](it iter.Seq[T], findFn func(T) (R, bool)) (R, bool) {
 	return zero, false
 }
 
-//TODO: Position, RPosition, Max, Min, MaxByKey, MaxBy, MinByKey, MinBy, Rev, Unzip, Copied, Cloned, Cycle, Sum, Product, Cmp, PartialCmp, Ne, Lt, Le, Gt, Ge, IsSorted, IsSortedBy, IsSortedByKey
+func Position[T any](it iter.Seq[T], pred func(T) bool) (uint, bool) {
+	index := uint(0)
+	for t := range it {
+		if pred(t) {
+			return index, true
+		}
+		index++
+	}
+	return 0, false
+}
+
+func RPosition[T any](it iter.Seq[T], pred func(T) bool) (uint, bool) {
+	found := false
+	index := uint(0)
+	var at uint
+	for t := range it {
+		if pred(t) {
+			found = true
+			at = index
+		}
+		index++
+	}
+	if found {
+		return at, true
+	} else {
+		return 0, false
+	}
+}
+
+func Max[T cmp.Ordered](it iter.Seq[T]) (T, bool) {
+	var maxVal T
+	var ok bool
+	for t := range it {
+		if !ok {
+			maxVal = t
+			ok = true
+		} else {
+			if t > maxVal {
+				maxVal = t
+			}
+		}
+	}
+	return maxVal, ok
+}
+
+func Min[T cmp.Ordered](it iter.Seq[T]) (T, bool) {
+	var minVal T
+	var ok bool
+	for t := range it {
+		if !ok {
+			minVal = t
+			ok = true
+		} else {
+			if t < minVal {
+				minVal = t
+			}
+		}
+	}
+	return minVal, ok
+}
+
+func MaxByKey[T any, R cmp.Ordered](it iter.Seq[T], keyFn func(T) R) (T, bool) {
+	var maxVal T
+	var maxKey R
+	var ok bool
+	var key R
+	for t := range it {
+		key = keyFn(t)
+		if !ok {
+			ok = true
+			maxVal, maxKey = t, key
+		} else {
+			if key > maxKey {
+				maxVal, maxKey = t, key
+			}
+		}
+	}
+	return maxVal, ok
+}
+
+func MaxBy[T any](it iter.Seq[T], compareFn func(T, T) int) (T, bool) {
+	var maxVal T
+	var ok bool
+	for t := range it {
+		if !ok {
+			maxVal = t
+			ok = true
+		} else {
+			if compareFn(t, maxVal) > 0 {
+				maxVal = t
+			}
+		}
+	}
+	return maxVal, ok
+}
+
+func MinByKey[T any, R cmp.Ordered](it iter.Seq[T], keyFn func(T) R) (T, bool) {
+	var minVal T
+	var minKey R
+	var ok bool
+	var key R
+	for t := range it {
+		key = keyFn(t)
+		if !ok {
+			ok = true
+			minVal, minKey = t, key
+		} else {
+			if key < minKey {
+				minVal, minKey = t, key
+			}
+		}
+	}
+	return minVal, ok
+}
+
+func MinBy[T any](it iter.Seq[T], compareFn func(T, T) int) (T, bool) {
+	var minVal T
+	var ok bool
+	for t := range it {
+		if !ok {
+			minVal = t
+			ok = true
+		} else {
+			if compareFn(t, minVal) < 0 {
+				minVal = t
+			}
+		}
+	}
+	return minVal, ok
+}
+
+func Rev[T any](it iter.Seq[T]) iter.Seq[T] {
+	temp := slices.Collect(it)
+	return func(yield func(T) bool) {
+		for i := len(temp) - 1; i >= 0; i-- {
+			if !yield(temp[i]) {
+				return
+			}
+		}
+	}
+}
+
+func Unzip[T, O any](it iter.Seq2[T, O]) (iter.Seq[T], iter.Seq[O]) {
+	var it1 iter.Seq[T]
+	var it2 iter.Seq[O]
+	it1 = func(yield func(T) bool) {
+		for t := range it {
+			if !yield(t) {
+				return
+			}
+		}
+	}
+	it2 = func(yield func(O) bool) {
+		for _, o := range it {
+			if !yield(o) {
+				return
+			}
+		}
+	}
+	return it1, it2
+}
+
+func Cloned[T any](it iter.Seq[*T]) iter.Seq[T] {
+	return func(yield func(T) bool) {
+		for t := range it {
+			if !yield(*t) {
+				return
+			}
+		}
+	}
+}
+
+func Cycle[T any](it iter.Seq[T]) iter.Seq[T] {
+	return func(yield func(T) bool) {
+		for {
+			for t := range it {
+				if !yield(t) {
+					return
+				}
+			}
+		}
+	}
+}
+
+func Sum[T cmp.Ordered](it iter.Seq[T]) T {
+	var sum T
+	for t := range it {
+		sum += t
+	}
+	return sum
+}
+
+type numeric interface {
+	~int | ~int8 | ~int16 | ~int32 | ~int64 |
+		~uint | ~uint8 | ~uint16 | ~uint32 | ~uint64 | ~uintptr |
+		~float32 | ~float64
+}
+
+func Product[T numeric](it iter.Seq[T]) T {
+	var prod T = 1
+	for t := range it {
+		prod *= t
+	}
+	return prod
+}
+
+func Cmp[T cmp.Ordered](it, other iter.Seq[T]) int {
+	next, stop := iter.Pull(other)
+	defer stop()
+	var ok bool
+	var o T
+	var comp int
+	for t := range it {
+		o, ok = next()
+		if !ok {
+			return 1
+		}
+		if comp = cmp.Compare(t, o); comp != 0 {
+			return comp
+		}
+	}
+	o, ok = next()
+	if ok {
+		return -1
+	}
+	return 0
+}
+
+func Ne[T cmp.Ordered](it, other iter.Seq[T]) bool {
+	return Cmp(it, other) != 0
+}
+
+func Lt[T cmp.Ordered](it, other iter.Seq[T]) bool {
+	return Cmp(it, other) < 0
+}
+
+func Le[T cmp.Ordered](it, other iter.Seq[T]) bool {
+	return Cmp(it, other) <= 0
+}
+
+func Gt[T cmp.Ordered](it, other iter.Seq[T]) bool {
+	return Cmp(it, other) > 0
+}
+
+func Ge[T cmp.Ordered](it, other iter.Seq[T]) bool {
+	return Cmp(it, other) == 0
+}
+
+func IsSorted[T cmp.Ordered](it iter.Seq[T]) bool {
+	index := uint(0)
+	var prev T
+	var comp, curComp int
+	for t := range it {
+		if index == 0 {
+			prev = t
+			index++
+			continue
+		}
+		curComp, prev = cmp.Compare(prev, t), t
+		if comp == 0 && curComp != 0 {
+			comp = curComp
+		}
+		if comp*curComp < 0 {
+			return false
+		}
+		index++
+	}
+	return true
+}
+
+func IsSortedBy[T any](it iter.Seq[T], compareFn func(T, T) int) bool {
+	index := uint(0)
+	var prev T
+	var comp, curComp int
+	for t := range it {
+		if index == 0 {
+			prev = t
+			index++
+			continue
+		}
+		curComp, prev = compareFn(prev, t), t
+		if comp == 0 && curComp != 0 {
+			comp = curComp
+		}
+		if comp*curComp < 0 {
+			return false
+		}
+		index++
+	}
+	return true
+}
+
+func IsSortedByKey[T any, K cmp.Ordered](it iter.Seq[T], keyFn func(T) K) bool {
+	index := uint(0)
+	var prev K
+	var comp, curComp int
+	for t := range it {
+		if index == 0 {
+			prev = keyFn(t)
+			index++
+			continue
+		}
+		curComp, prev = cmp.Compare(prev, keyFn(t)), keyFn(t)
+		if comp == 0 && curComp != 0 {
+			comp = curComp
+		}
+		if comp*curComp < 0 {
+			return false
+		}
+		index++
+	}
+	return true
+}
